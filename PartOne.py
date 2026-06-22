@@ -2,6 +2,7 @@
 
 # Note: The template functions here and the dataframe format for structuring your solution is a suggested but not mandatory approach. You can use a different approach if you like, as long as you clearly answer the questions and communicate your answers clearly.
 
+import datetime
 import string
 import nltk
 import spacy
@@ -26,7 +27,6 @@ def fk_level(text, d):
     """
     pass
 
-
 def count_syl(word, d):
     """Counts the number of syllables in a word given a dictionary of syllables per word.
     if the word is not in the dictionary, syllables are estimated by counting vowel clusters
@@ -40,29 +40,55 @@ def count_syl(word, d):
     """
     pass
 
-
 def read_novels(path=Path.cwd() / "texts" / "novels"):
     """Reads texts from a directory of .txt files and returns a DataFrame with the text, title,
-    author, and year"""
-    novels = os.listdir(f"{Path.cwd()}/texts/novels")
-    # vectorise list of novels
-    novels = [n for n in novels]
+    author, and year, reference: https://builtin.com/data-science/python-list-files-in-directory"""
+    # Initialise dataframe rows
+    rows = []
 
-    for val in novels:
-        print(f"Novel title {val}")
-        print(f"Title of novel is ", val)
-        columns = ["text", "title", "author", "year"]
-        df = pd.DataFrame(columns=columns)
-        df.sort_values(by="year", inplace=True)
-        print(df)
-        pass
-    return
+    # handle condition where novel file is not a text file
+    for file in os.listdir(path):
+        if not file.endswith(".txt"):
+            continue
+        novels_path = path / file
+
+        # Read text    
+        txt = novels_path.read_text(encoding="utf-8")
+
+        # Start with a split function to extract the columns from each novel
+        split_filename = novels_path.stem
+        filename_parts = split_filename.split('-')
+
+        # Get all parts of the file according to column names, we need at least three parts
+        if len(filename_parts) == 3:
+            # assign columns to the parts
+            title, author, year = filename_parts 
+            # Use a try/catch to get the year for sorting the dataframe (df) and assign data type to col
+            try:
+                year = int(year)
+            except ValueError:
+                year = "None"
+        else:
+            title, author, year = filename_parts[0], filename_parts[1], filename_parts[2]
+
+        # create dataframe using pandas (pd) - also clean special chars from the text and title
+        rows.append({
+            "text": txt.replace('\n',' '),
+            "title": title.replace('_',' '),
+            "author": author,
+            "year": year
+        }) 
+    # create dataframe using pandas (pd)
+    df = pd.DataFrame(rows, columns=["text", "title", "author", "year"])
+    df_sorted = df.sort_values(by="year", ascending=True)
+    print(df_sorted)
+    pass
+    return df
 
 def parse(df, store_path=Path.cwd() / "pickles", out_name="parsed.pickle"):
     """Parses the text of a DataFrame using spaCy, stores the parsed docs as a column and writes 
     the resulting  DataFrame to a pickle file"""
     pass
-
 
 def nltk_ttr(text):
     """Calculates the type-token ratio of a text. Text is tokenized using nltk.word_tokenize. Referred to: https://www.kaggle.com/code/kelixirr/tokenization-text-processing-in-nlp"""
@@ -88,12 +114,11 @@ def nltk_ttr(text):
     }
 
     return {
-        "tokens": len(tokens),
+        "tokens": len(tokenised_documents),
         "types": len(types),
         "ttr": ttr
     }
     pass
-
 
 def get_ttrs(df):
     """helper function to add ttr to a dataframe"""
@@ -102,7 +127,6 @@ def get_ttrs(df):
         results[row["title"]] = nltk_ttr(row["text"])
     return results
 
-
 def get_fks(df):
     """helper function to add fk scores to a dataframe"""
     results = {}
@@ -110,7 +134,6 @@ def get_fks(df):
     for i, row in df.iterrows():
         results[row["title"]] = round(fk_level(row["text"], cmudict), 4)
     return results
-
 
 #.. add functions for part (e) here
 
