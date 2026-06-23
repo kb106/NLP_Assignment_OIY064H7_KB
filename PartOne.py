@@ -8,11 +8,17 @@ import nltk
 import spacy
 from pathlib import Path
 import pandas as pd
-
 import os
 
-nlp = spacy.load("en_core_web_sm")
-nlp.max_length = 2000000
+try:
+    nlp = spacy.load("en_core_web_sm")
+    nlp.max_length = 2000000
+except OSError:
+    raise(
+            "Error when loading spacy model: 'en_core_web_sm' not found. Install it with:\n"
+            "python -m spacy download en_core_web_sm - {ValueError}"
+        )
+
 
 def fk_level(text, d):
     """Returns the Flesch-Kincaid Grade Level of a text (higher grade is more difficult).
@@ -42,7 +48,8 @@ def count_syl(word, d):
 
 def read_novels(path=Path.cwd() / "texts" / "novels"):
     """Reads texts from a directory of .txt files and returns a DataFrame with the text, title,
-    author, and year, reference: https://builtin.com/data-science/python-list-files-in-directory"""
+    author, and year, reference: https://builtin.com/data-science/python-list-files-in-directory, 
+    as well as a local instance of Ollama API to clean up code"""
     # Initialise dataframe rows
     rows = []
 
@@ -82,6 +89,7 @@ def read_novels(path=Path.cwd() / "texts" / "novels"):
     df = pd.DataFrame(rows, columns=["text", "title", "author", "year"])
     df_sorted = df.sort_values(by="year", ascending=True)
     print(df_sorted)
+
     pass
     return df
 
@@ -92,39 +100,34 @@ def parse(df, store_path=Path.cwd() / "pickles", out_name="parsed.pickle"):
 
 def nltk_ttr(text):
     """Calculates the type-token ratio of a text. Text is tokenized using nltk.word_tokenize. Referred to: https://www.kaggle.com/code/kelixirr/tokenization-text-processing-in-nlp"""
-    
-    # Split all punctuation in text into its own tokens
-    word_punctuation_tokenizer = nltk.WordPunctTokenizer()
-    word_punctuation_tokens = word_punctuation_tokenizer.tokenize(text)
-    # Clean punctuation - referred to: https://www.geeksforgeeks.org/python/string-punctuation-in-python/
-    cleantxt = [t for t in word_punctuation_tokens if t not in string.punctuation]
+    # Use spacy, reference: https://spacy.io/models/en
+    # Reference global variable for spacy to extract and tokenise text
+    output_text = nlp(text)
+    # For TTR ration we want to measure the value returned between 1 (highly diverse and unique set of words) and 0 or higher repetition
+    # Vectorize token call, ensure text is not case-sensitive and use is_alpha to filter out punctuation before parsing texts to get TTR
+    tokens = [token.text.lower() for token in output_text if token.is_alpha]
 
-    # Tokenise cleaned punctuation from txt
-    tokenised_documents = nltk.word_tokenize(cleantxt)
+    # Handle cases where there are no tokens and return null 
+    if not tokens:
+        return 0.0
+    else:
+        # Set unique tokens (words) - or more diverse words
+        unique_instances =  set(tokens)      
+        #Use ttr to divide the number of words by the number of unique words. If there are no tokens, return 0.
+        ttr = len(unique_instances) / len(tokens) if tokens else 0
 
-    # Set types from tokenised documents
-    types = set(tokenised_documents)
-    #Use ttr to divide the number of words by the number of unique words. If there are no tokens, return 0.
-    ttr = len(types).lower() / len(tokenised_documents) if tokenised_documents else 0
-    #Define dictionary and now map values to the ttr values
-    dictionary = text.dictionary(tokenised_documents)
-
-    dict.mapping = {
-        "title": ttr
-    }
-
-    return {
-        "tokens": len(tokenised_documents),
-        "types": len(types),
-        "ttr": ttr
-    }
+    return ttr
     pass
 
 def get_ttrs(df):
     """helper function to add ttr to a dataframe"""
+    # Define dictionary and now map values to the ttr values
+    # map title of novel to ttr using dictionary
     results = {}
+    
     for i, row in df.iterrows():
-        results[row["title"]] = nltk_ttr(row["text"])
+        results[row["title"]]=nltk_ttr(row["text"])
+    print(f"Novel title and TTR value: {results}") 
     return results
 
 def get_fks(df):
@@ -144,6 +147,7 @@ if __name__ == "__main__":
     path = Path.cwd() / "texts" / "novels"
     print(path)
     df = read_novels(path) # this line will fail until you have completed the read_novels function above.
+    get_ttrs(df)
     # print(df.head())
     # nltk.download("cmudict")
     # parse(df)
