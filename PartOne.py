@@ -2,6 +2,7 @@
 
 # Note: The template functions here and the dataframe format for structuring your solution is a suggested but not mandatory approach. You can use a different approach if you like, as long as you clearly answer the questions and communicate your answers clearly.
 import pickle
+import re
 
 import nltk
 import spacy
@@ -31,6 +32,7 @@ def fk_level(text, d):
 
         ASL = Avg Sentence Length
         ASW = Avg Word Length
+        
     Args:
         text (str): The text to analyze.
         d (dict): A dictionary of syllables per word.
@@ -40,6 +42,7 @@ def fk_level(text, d):
     """
     #  Referred to WK4 - Sentences and https://datawarrior.wordpress.com/2016/03/29/flesch-kincaid-readability-measure/
     # Set fkresults as the dictionary to add to
+    
     fkresults = {}
     num_syllables = 0
     total_syllables = 0
@@ -53,34 +56,22 @@ def fk_level(text, d):
     sylldict = nltk.corpus.cmudict.dict()
 
     for word in tokens:
-      try:
-        if word in sylldict:
-            # Referenced syllable count pattern from: https://gist.github.com/drinks/2483508
-            phonemes =  sylldict[word][0]
-            num_syllables += len([i for i in phonemes if i[-1].isdigit()])
+        # Handle cases where the number of words or sentences returns NULL
+        if num_words == 0 or num_sentences == 0:
+            return 0.0
+    
         else:
-            total_syllables += 1
-          # Handle words missing from dictionary...    
-      except KeyError:
-            num_syllables = 1.66 
-
-    # Handle cases where the number of words or sentences returns NULL
-    if num_words == 0 or num_sentences == 0:
-        return 0.0
+            # count number of syllables in a word by calling the function below
+            total_syllables += count_syl(word, sylldict)
 
     # Formula for Averages and FK
     avg_words_sentence = num_words / num_sentences if num_sentences > 0 else 0 # avergae out the number of words in each sentence
-    avg_syll_word = num_syllables / num_words if num_words > 0 else 0 # average out the number of syllables per word
+    avg_syll_word = total_syllables / num_words if num_words > 0 else 0 # average out the number of syllables per word
  
-    # Formula for reading Ease score = 206.835 - (1.015 × ASL) - (84.6 × ASW)
-    fkresults = 206.835 - (1.015 * avg_words_sentence) - (84.6 * avg_syll_word)
-    # for i, row in text.iterrows():
-    #     fkresults[row["title"]] = round(fk_level(row["text"], cmudict), 4)
-
-    # Create dictionary of syllables per word
-    # syllable_count={
-
-    # }
+    # Formula for reading Ease score =  (0.39 × ASL) + (11.8 × ASW) - 15.59  
+    # reference: https://readabilityformulas.com/learn-how-to-use-the-flesch-kincaid-grade-level/
+    fkresults =  (0.39 * avg_words_sentence) + (11.8 * avg_syll_word) - 15.59
+  
     return fkresults 
     pass
 
@@ -95,6 +86,28 @@ def count_syl(word, d):
     Returns:
         int: The number of syllables in the word.
     """
+    num_syllables = 0
+    getword = word.lower().strip()
+
+    try:
+        if not getword or not getword.isalpha():
+            return 0
+
+        if getword in d:
+            # Referenced syllable count pattern from: https://gist.github.com/drinks/2483508
+            phonemes =  d[getword][0]
+            num_syllables += len([i for i in phonemes if i[-1].isdigit()])
+
+        else:
+            # Handle words missing from dictionary by counting the instances of vowels in a word (fallback ONLY)...    
+            vowelcount = re.findall(f'r[aeiou]+', getword)
+            vowel_cluster = len(vowelcount)
+            num_syllables =  vowel_cluster
+
+    except KeyError:
+           print(f"Unable to process count of syllables in word")
+        
+    return num_syllables
     pass
 
 def read_novels(path=Path.cwd() / "texts" / "novels"):
@@ -161,6 +174,9 @@ def parse(df, store_path=Path.cwd() / "pickles", out_name="parsed.pickle"):
         
     # define column to add text object too and use DocBin to setup the doc object we need
     df['parsed_docs'] = parsed_docs
+
+    #Section for saving and reading each novel text to/from pickle file   # 
+
     # Assign doc object to pickle file - referred to: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_pickle.html
     df.to_pickle(str(doc_text_path))
 
@@ -179,7 +195,7 @@ def parse(df, store_path=Path.cwd() / "pickles", out_name="parsed.pickle"):
 
 def nltk_ttr(text):
     """Calculates the type-token ratio of a text. Text is tokenized using nltk.word_tokenize. Referred to: https://www.kaggle.com/code/kelixirr/tokenization-text-processing-in-nlp"""
-    # Use spacy, reference: https://spacy.io/models/en
+    # Use spacy, reference: https://spacy.io/models/en and Lab3 sentences from NLP course 
     # Reference global variable for spacy to extract and tokenise text
     output_text = nltk.word_tokenize(text)
     # For TTR ratio we want to measure the value returned between 1 (highly diverse and unique set of words) and 0 or higher repetition
@@ -236,6 +252,4 @@ if __name__ == "__main__":
     # print(get_ttrs(df))
     # print(get_fks(df))
     df = pd.read_pickle(Path.cwd() / "pickles" /"parsed.pickle")
-    # 1. Check your DataFrame shape and column names
-    print(df.info())
     # call functions for part (e) here.
