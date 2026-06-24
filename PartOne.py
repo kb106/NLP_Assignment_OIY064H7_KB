@@ -1,8 +1,11 @@
 #NLP assessment template 2026
 
 # Note: The template functions here and the dataframe format for structuring your solution is a suggested but not mandatory approach. You can use a different approach if you like, as long as you clearly answer the questions and communicate your answers clearly.
+import pickle
+
 import nltk
 import spacy
+from spacy.tokens import DocBin
 from pathlib import Path
 import pandas as pd
 
@@ -144,6 +147,34 @@ def read_novels(path=Path.cwd() / "texts" / "novels"):
 def parse(df, store_path=Path.cwd() / "pickles", out_name="parsed.pickle"):
     """Parses the text of a DataFrame using spaCy, stores the parsed docs as a column and writes 
     the resulting  DataFrame to a pickle file"""
+    # use dataframe with spacy nlp to retrieve text field contents in a list- referred to: https://spacy.io/usage/saving-loading
+    parsed_docs = list(nlp.pipe(df["text"].astype(str), disable=["tok2vec", "parser", "ner"]))
+    doc_bin = DocBin(attrs=["ORTH", "IS_ALPHA" ,"LEMMA"])
+    # Define the path to output too
+    store_path.mkdir(parents=True, exist_ok=True)
+    doc_text_path = store_path / out_name 
+
+    # Loop to get texts into objects
+    for doc in parsed_docs:
+        # create document object and convert to bytes to serialise
+        doc_bin.add(doc)
+        
+    # define column to add text object too and use DocBin to setup the doc object we need
+    df['parsed_docs'] = parsed_docs
+    # Assign doc object to pickle file - referred to: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_pickle.html
+    df.to_pickle(str(doc_text_path))
+
+    print(f"{doc_text_path} file successfully saved")
+
+    for i, row in df.iterrows():
+        title = row["title"]
+        noveltext = row["parsed_docs"][:500]
+        print(
+            f"\n-----Novel Title  {title}"
+            f"\n {noveltext}... "
+        ) # Prints lemmas of the first 500 words
+
+    return df
     pass
 
 def nltk_ttr(text):
@@ -151,7 +182,7 @@ def nltk_ttr(text):
     # Use spacy, reference: https://spacy.io/models/en
     # Reference global variable for spacy to extract and tokenise text
     output_text = nltk.word_tokenize(text)
-    # For TTR ration we want to measure the value returned between 1 (highly diverse and unique set of words) and 0 or higher repetition
+    # For TTR ratio we want to measure the value returned between 1 (highly diverse and unique set of words) and 0 or higher repetition
     # Vectorize token call, ensure text is not case-sensitive and use is_alpha to filter out punctuation before parsing texts to get TTR
     tokens = [token.lower() for token in output_text if token.isalpha]
 
@@ -200,9 +231,11 @@ if __name__ == "__main__":
     nltk.download("cmudict")
     get_fks(df)
     # print(df.head())
-    # parse(df)
+    parse(df)
     # print(df.head())
     # print(get_ttrs(df))
     # print(get_fks(df))
-    # df = pd.read_pickle(Path.cwd() / "pickles" /"name.pickle")
+    df = pd.read_pickle(Path.cwd() / "pickles" /"parsed.pickle")
+    # 1. Check your DataFrame shape and column names
+    print(df.info())
     # call functions for part (e) here.
