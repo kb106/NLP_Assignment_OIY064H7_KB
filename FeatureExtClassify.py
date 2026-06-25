@@ -2,6 +2,7 @@
 
 import os
 import glob
+import pandas as pd
 
 # Referred to Lab 3 Part 1 processing inaugural speeches - NLP course
 
@@ -16,10 +17,17 @@ def process_inaugural_speeches(files):
    filename = os.path.basename(speech_file)
 
    with open(speech_file, 'r', encoding="utf-8", errors="ignore") as file:
-     speech_content = file.read()
+     speech_content = pd.read_csv(file, usecols=["speech", "party", "major_heading", "year"])
      inaugural_speeches[filename] = speech_content
 
-     print(speech_content)
+     for i, row in speech_content.iterrows():
+      # Define columns to process 
+      rtn_speech = row["speech"]
+      rtn_byline =  row["major_heading"]
+      rtn_year =  row["year"]
+      rtn_party =  row["party"]
+
+     print(f"Political party: {rtn_party} \n-----\n  Year: {rtn_year} \n-----\n  Speech Byline: {rtn_byline}  \n-----\n  Speech: {rtn_speech}")
  
 if __name__ == "__main__":
     """
