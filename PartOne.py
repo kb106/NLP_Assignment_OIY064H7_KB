@@ -1,6 +1,7 @@
 #NLP assessment template 2026
 
 # Note: The template functions here and the dataframe format for structuring your solution is a suggested but not mandatory approach. You can use a different approach if you like, as long as you clearly answer the questions and communicate your answers clearly.
+from collections import defaultdict
 import pickle
 import re
 
@@ -72,6 +73,7 @@ def fk_level(text, d):
     # reference: https://readabilityformulas.com/learn-how-to-use-the-flesch-kincaid-grade-level/
     fkresults =  (0.39 * avg_words_sentence) + (11.8 * avg_syll_word) - 15.59
   
+    # Some novel text return lower complexity scores for readability when in fact the prose is dense, and the presence of single syllables per word does not always accurately measure readability 
     return fkresults 
     pass
 
@@ -160,7 +162,9 @@ def read_novels(path=Path.cwd() / "texts" / "novels"):
 def parse(df, store_path=Path.cwd() / "pickles", out_name="parsed.pickle"):
     """Parses the text of a DataFrame using spaCy, stores the parsed docs as a column and writes 
     the resulting  DataFrame to a pickle file"""
-    # use dataframe with spacy nlp to retrieve text field contents in a list- referred to: https://spacy.io/usage/saving-loading
+    # use dataframe with spacy nlp to retrieve text field contents in a list, also set the nlp parsed output to a max length - referred to: https://spacy.io/usage/saving-loading
+    # max_length for nlp referred to: https://spacy.io/api/language
+    nlp.max_length = 3000000
     parsed_docs = list(nlp.pipe(df["text"].astype(str), disable=["tok2vec", "parser", "ner"]))
     doc_bin = DocBin(attrs=["ORTH", "IS_ALPHA" ,"LEMMA"])
     # Define the path to output too
@@ -175,8 +179,7 @@ def parse(df, store_path=Path.cwd() / "pickles", out_name="parsed.pickle"):
     # define column to add text object too and use DocBin to setup the doc object we need
     df['parsed_docs'] = parsed_docs
 
-    #Section for saving and reading each novel text to/from pickle file   # 
-
+    #Section for saving and reading each novel text to/from pickle file# 
     # Assign doc object to pickle file - referred to: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_pickle.html
     df.to_pickle(str(doc_text_path))
 
@@ -184,7 +187,7 @@ def parse(df, store_path=Path.cwd() / "pickles", out_name="parsed.pickle"):
 
     for i, row in df.iterrows():
         title = row["title"]
-        noveltext = row["parsed_docs"][:500]
+        noveltext = row["parsed_docs"][:nlp.max_length]
         print(
             f"\n-----Novel Title  {title}"
             f"\n {noveltext}... "
@@ -235,6 +238,82 @@ def get_fks(df):
     return results
 
 #.. add functions for part (e) here
+def get_subjects(df):
+ '''List of top 10 most common subject areas in text within novels'''
+
+
+def get_pmi_subject(df):
+ '''PMI list of verbs most likely to occur where the subject 'he' is used in text within novels'''
+ # Referred to: NLP Lab3 ipynb file section 5 on PMI
+ all_text = parse(df)
+ word_counts = defaultdict(int)
+ corpus_size = len(all_text.split)
+
+ # Most common VERBS where the PRONOUN he is present
+ # Set array to hold the resulting pair fo verbs to pronoun he 
+ verb_he_pairs = []
+ verb_she_pairs = []
+
+ # iterate over rows
+ for i, row in all_text.iterrows():
+     novel_doc = row["parsed_docs"]
+     novel_parsed = nlp(novel_doc)
+              
+     for tok in novel_parsed:
+        # Ensuring that correct pronoun can be found following a verb by using token - child (Rule: verb always precedes pronoun, which is the child)
+        if tok.pos_ == "VERB" and any(child.pos_ in ["PRON"] and child.text.lower() == "he" for child in tok.children):
+            # Find VERBS and match pronouns - 'he'
+            potential_verb = tok.head
+            if potential_verb.pos_ == "AUX":
+                potential_verb = potential_verb.head
+
+            if potential_verb.pos_ == "VERB":
+                # set verbs and pronouns found to lower case to capture all possible matches
+                verbword = potential_verb.text.lower()
+                pronounword = potential_verb.text.lower()
+                
+                # Append pais of verbs to pronoun
+                verb_he_pairs.append({
+                    "Verb_word_he": verbword,
+                    "Pronoun_word_he": pronounword
+                })
+                # Store all resulting verbs from pronoun 'he'
+                word_counts["Verb_word_he"] += 1
+                word_counts["Pronoun_word_he"] += 1
+
+        elif tok.pos_ == "VERB" and any(child.pos_ in ["PRON"] and child.text.lower() == "she" for child in tok.children):
+            # Find VERBS and match pronouns - 'she'
+            potential_verb = tok.head
+            if potential_verb.pos_ == "AUX":
+                potential_verb = potential_verb.head
+            
+            if potential_verb.pos_ == "VERB":
+                verbword = potential_verb.text.lower()
+                pronounword = potential_verb.text.lower()
+                # Append pais of verbs to pronoun
+                verb_she_pairs.append({
+                    "Verb_word_she": verbword,
+                    "Pronoun_word_she": pronounword
+                })
+                # Store all resulting verbs from pronoun 'she'
+                word_counts["Verb_word_she"] += 1
+                word_counts["Pronoun_word_she"] += 1
+
+        # Now complete PMI calculations
+        # Formula: PMI(x, y) = log2(P(x,y) / (P(x) * P(y)))
+        # where:
+        # x and y   are the two words being analyzed (common verb, or x, and he or she, or y)
+        # P(x,y)    is the probability of both x and y occurring together in a text corpus
+        # P(x)      is the probability of x occurring in the corpus
+        # P(y)      is the probability of y occurring in the corpus
+        # verb_word_he_total = "Verb_word_he" / corpus_size
+        # verb_word_she_total = "Verb word she" / corpus_size
+        # word_pair_total = word_counts / corpus_size
+        # PMI = log2(word_pair_total,) / ("Verb_word_she" )
+# print verb - pron pairs
+ print(verb_he_pairs)
+ print(verb_she_pairs)
+ return verb_he_pairs, verb_she_pairs
 
 if __name__ == "__main__":
     """
@@ -248,6 +327,7 @@ if __name__ == "__main__":
     get_fks(df)
     # print(df.head())
     parse(df)
+    get_pmi_subject(df)
     # print(df.head())
     # print(get_ttrs(df))
     # print(get_fks(df))
