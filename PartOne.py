@@ -165,7 +165,7 @@ def parse(df, store_path=Path.cwd() / "pickles", out_name="parsed.pickle"):
     # use dataframe with spacy nlp to retrieve text field contents in a list, also set the nlp parsed output to a max length - referred to: https://spacy.io/usage/saving-loading
     # max_length for nlp referred to: https://spacy.io/api/language
     nlp.max_length = 3000000
-    parsed_docs = list(nlp.pipe(df["text"].astype(str), disable=["tok2vec", "parser", "ner"]))
+    parsed_docs = list(nlp.pipe(df["text"].astype(str), disable=["tok2vec", "ner"]))
     doc_bin = DocBin(attrs=["ORTH", "IS_ALPHA" ,"LEMMA"])
     # Define the path to output too
     store_path.mkdir(parents=True, exist_ok=True)
@@ -240,28 +240,34 @@ def get_fks(df):
 #.. add functions for part (e) here
 def get_subjects(df):
  '''List of top 10 most common subject areas in text within novels'''
-
-
-def get_pmi_subject(df):
- '''PMI list of verbs most likely to occur where the subject 'he' is used in text within novels'''
- # Referred to: NLP Lab3 ipynb file section 5 on PMI
  all_text = parse(df)
- word_counts = defaultdict(int)
- corpus_size = len(all_text.split)
 
- # Most common VERBS where the PRONOUN he is present
- # Set array to hold the resulting pair fo verbs to pronoun he 
- verb_he_pairs = []
- verb_she_pairs = []
-
- # iterate over rows
+# iterate over txt rows
  for i, row in all_text.iterrows():
      novel_doc = row["parsed_docs"]
      novel_parsed = nlp(novel_doc)
-              
-     for tok in novel_parsed:
+
+      #for tok in novel_parsed:
+        #Get top 10 subjects by summarising text themes by using hugging face
+
+def get_pmi_subject(parsed_df):
+ '''PMI list of verbs most likely to occur where the subject 'he' or 'she' is used in text within novels'''
+ # Referred to: NLP Lab3 ipynb file section 5 on PMI
+ corpus_size = len(parsed_df)
+
+ # Most common VERBS where the PRONOUN he is present
+ # Set array to hold the resulting pair fo verbs to pronoun he 
+ verb_counts = defaultdict(int)
+ pron_counts = defaultdict(int)
+ pair_counts = defaultdict(int)
+
+ # iterate over txt batches - using call to column directly to return the text via the dataFrame
+ for doc in parsed_df["parsed_docs"]:
+     for tok in doc:
         # Ensuring that correct pronoun can be found following a verb by using token - child (Rule: verb always precedes pronoun, which is the child)
-        if tok.pos_ == "VERB" and any(child.pos_ in ["PRON"] and child.text.lower() == "he" for child in tok.children):
+        if tok.pos_ in ["PRON"] and tok.text.lower() in ["he" or "she"]:
+            pronoun = tok.text.lower()
+            pron_counts[pronoun] += 1
             # Find VERBS and match pronouns - 'he'
             potential_verb = tok.head
             if potential_verb.pos_ == "AUX":
@@ -269,37 +275,18 @@ def get_pmi_subject(df):
 
             if potential_verb.pos_ == "VERB":
                 # set verbs and pronouns found to lower case to capture all possible matches
-                verbword = potential_verb.text.lower()
-                pronounword = potential_verb.text.lower()
-                
-                # Append pais of verbs to pronoun
-                verb_he_pairs.append({
-                    "Verb_word_he": verbword,
-                    "Pronoun_word_he": pronounword
-                })
+                verbword = potential_verb.lemma_.lower()
+                #pronounword = potential_verb.text.lower()
+                verb_counts[verbword] += 1
+                # Append pairs of verbs to pronoun
+                pair_counts[(verbword, pronoun)] += 1
                 # Store all resulting verbs from pronoun 'he'
-                word_counts["Verb_word_he"] += 1
-                word_counts["Pronoun_word_he"] += 1
+ if not pair_counts:
+    print(f"No pairs found")
+    return [], []
 
-        elif tok.pos_ == "VERB" and any(child.pos_ in ["PRON"] and child.text.lower() == "she" for child in tok.children):
-            # Find VERBS and match pronouns - 'she'
-            potential_verb = tok.head
-            if potential_verb.pos_ == "AUX":
-                potential_verb = potential_verb.head
-            
-            if potential_verb.pos_ == "VERB":
-                verbword = potential_verb.text.lower()
-                pronounword = potential_verb.text.lower()
-                # Append pais of verbs to pronoun
-                verb_she_pairs.append({
-                    "Verb_word_she": verbword,
-                    "Pronoun_word_she": pronounword
-                })
-                # Store all resulting verbs from pronoun 'she'
-                word_counts["Verb_word_she"] += 1
-                word_counts["Pronoun_word_she"] += 1
-
-        # Now complete PMI calculations
+        # TO DO  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #  #
+        # Now complete PMI calculations - referred to Lab3 example and https://medium.com/@fr4nk/understanding-pointwise-mutual-information-a-beginners-guide-dcfed0f83ff2
         # Formula: PMI(x, y) = log2(P(x,y) / (P(x) * P(y)))
         # where:
         # x and y   are the two words being analyzed (common verb, or x, and he or she, or y)
@@ -308,12 +295,10 @@ def get_pmi_subject(df):
         # P(y)      is the probability of y occurring in the corpus
         # verb_word_he_total = "Verb_word_he" / corpus_size
         # verb_word_she_total = "Verb word she" / corpus_size
-        # word_pair_total = word_counts / corpus_size
-        # PMI = log2(word_pair_total,) / ("Verb_word_she" )
-# print verb - pron pairs
- print(verb_he_pairs)
- print(verb_she_pairs)
- return verb_he_pairs, verb_she_pairs
+        # word_pair_total = word_pair_counts_he / corpus_size
+        # PMI = log2(word_pair_total) / ("Verb_word_she" )
+ # print verb - pron pairs
+ return pair_counts, verb_counts, pron_counts
 
 if __name__ == "__main__":
     """
@@ -326,7 +311,7 @@ if __name__ == "__main__":
     nltk.download("cmudict")
     get_fks(df)
     # print(df.head())
-    parse(df)
+    parsed_df = parse(df)
     get_pmi_subject(df)
     # print(df.head())
     # print(get_ttrs(df))
