@@ -165,7 +165,7 @@ def parse(df, store_path=Path.cwd() / "pickles", out_name="parsed.pickle"):
     # use dataframe with spacy nlp to retrieve text field contents in a list, also set the nlp parsed output to a max length - referred to: https://spacy.io/usage/saving-loading
     # max_length for nlp referred to: https://spacy.io/api/language
     nlp.max_length = 3000000
-    parsed_docs = list(nlp.pipe(df["text"].astype(str), disable=["tok2vec", "ner"]))
+    parsed_docs = list(nlp.pipe(df["text"].astype(str), disable=["lemmatizer", "ner"]))
     doc_bin = DocBin(attrs=["ORTH", "IS_ALPHA" ,"LEMMA"])
     # Define the path to output too
     store_path.mkdir(parents=True, exist_ok=True)
