@@ -11,7 +11,6 @@ files = sorted(glob.glob(os.path.join('texts/', '*.csv' )))
 def process_inaugural_speeches(files):
  # Define a corpus to process
  inaugural_speeches = {}
- print(f"Hello!")
 
  for speech_file in files:
    filename = os.path.basename(speech_file)
@@ -21,7 +20,6 @@ def process_inaugural_speeches(files):
      inaugural_speeches[filename] = speech_content
 
      print(speech_content)
-     
  
 if __name__ == "__main__":
     """
