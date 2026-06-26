@@ -3,6 +3,7 @@
 import os
 import glob
 import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 # Referred to Lab 3 Part 1 processing inaugural speeches - NLP course
 
@@ -94,7 +95,11 @@ def process_inaugural_speeches(df):
 def vectorise_speeches(df):
    '''Vectorise the speeches using TfidfVectorizer from scikit-learn''' 
    # Referred to: https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html
-
+   # Call vectorizer using sklearn import for Tfidf, transform DataFrame text and print names
+   vectorizer = TfidfVectorizer()
+   vector_transform = vectorizer.fit_transform(df)
+   vectorizer.get_feature_names_out()
+   print(vector_transform.shape)
 
 if __name__ == "__main__":
     """
