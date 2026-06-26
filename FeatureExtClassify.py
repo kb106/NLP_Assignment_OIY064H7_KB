@@ -9,8 +9,20 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report, f1_score
 import numpy as np
+import spacy 
 
 # Referred to Lab 3 Part 1 processing inaugural speeches - NLP course
+
+# Using spacy import for custom tokenizer
+try:
+    nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+    nlp.max_length = 2000000
+except OSError:
+    nlp = None
+    raise(
+            "Error when loading spacy model: 'en_core_web_sm' not found. Install it with:\n"
+            "python -m spacy download en_core_web_sm - {ValueError}"
+        )
 
 def process_inaugural_speeches(df):
   # Define a corpus to process
@@ -79,6 +91,20 @@ def process_inaugural_speeches(df):
   #Print confirmartion after the loop finishes processing all rows
   print(f"\n[DONE] Processing complete.")
 
+def custom_tokenizer(text):
+   '''Use a custom tokenizer with NLP to reduce density of words - use spacy to do this'''
+   doc = nlp(text)
+   reduce_text_density = []
+
+   for token in doc:
+      if(
+         token.is_alpha
+         and not token.is_stop
+         and len(token.text)
+      ):
+         reduce_text_density.append(token.lemma_.lower().strip())
+   return reduce_text_density
+
 def vectorise_speeches(df):
    '''Vectorise the speeches using TfidfVectorizer from scikit-learn - 
    Label to predict is party classifier (i.e. to identify which political party likely made the speech) ''' 
@@ -99,14 +125,22 @@ def vectorise_speeches(df):
 
    # Define the two n-gram settings you want to compare
    configs = [
-        {"name": "Standard 1-Grams", "range": (1, 1)},
-        {"name": "Advanced 2,3-Grams", "range": (2, 3)}
+        {"name": "Standard 1-Grams", "range": (1, 1), "tokenizer": None},
+        {"name": "Advanced 2,3-Grams", "range": (2, 3), "tokenizer": None},
+        {"name": "Custom-Tokenizer", "range": (1, 1), "tokenizer": custom_tokenizer}      
    ]
 
    for config in configs:
      # 1. Use AML to extract feature set - also allow for uni (1 word feature), bi (2 word feature) and tri (3 word feature) - grams to be included in the vectorised output
      # For n-grams referred to: https://www.geeksforgeeks.org/machine-learning/tf-idf-for-bigrams-trigrams/
-     vectorizer = TfidfVectorizer(stop_words=stopwords, max_features=max_features, ngram_range=config["range"])
+     vectorizer = TfidfVectorizer(
+        stop_words=None if config["tokenizer"] else stopwords, 
+        max_features=max_features, 
+        ngram_range=config["range"],
+        tokenizer=config["tokenizer"],
+        token_pattern=None if config["tokenizer"] else r"(?u)\b\w\w+\b"
+     )
+
      X_features = vectorizer.fit_transform(X_speechtext)
      print(f"Extraction vector dimensions or shape is: {X_features.shape}")
 
@@ -120,7 +154,7 @@ def vectorise_speeches(df):
      )
    
      # TRAINING: For trinaing use SVM/ linear kernel classifiers on the training set
-     rf_model = RandomForestClassifier(n_estimators=n_estimators, random_state=random_seed)
+     rf_model = RandomForestClassifier(n_estimators=n_estimators, random_state=random_seed, class_weight='balanced_subsample', n_jobs=-1)
      rf_model.fit(X_trainset, Y_trainset)
 
      # TESTING: Print macro-average-f1-score and classification report for each classifier on the test set 
@@ -132,7 +166,7 @@ def vectorise_speeches(df):
      print(classification_report(Y_testset, rf_prediction))
 
      # SVM classifier, using a linear classifier
-     svm_model = SVC(kernel='linear', random_state=random_seed)
+     svm_model = SVC(kernel='linear', random_state=random_seed, class_weight='balanced')
      svm_model.fit(X_trainset, Y_trainset)
      # Linear performance
      svm_prediction = svm_model.predict(X_testset)
