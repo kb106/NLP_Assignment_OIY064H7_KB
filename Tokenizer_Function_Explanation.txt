@@ -1,1 +1,17 @@
-The tokenizer function does the following: 
+The purpose of the tokenizer functions is to firstly, prepare the dataset to be processed by replacing unwanted values and removing rows to clean up the dataset,
+and allow for consistent processing, the shape or number of rows and columns in the dataset is then returned so that we understand what data needs to be tokenized; 
+secondly, the tokenizer function then moves on to vectorize the inaugural speeches so that we can draw predictive conclusions about the dataset, in this case,
+we wanted to predict which political party (i.e. 'party') may have given a particular speech (i.e. 'speech') by completing an analysis of a corpora or texts, to achieve this
+the text can be tokenized and analysed througha series of machine learning steps, starting with the use of the sklearn python module TfidfTokenizer
+which is used to extract features or common themes from the corpora of texts, to ensure that we collect the best cross section of
+features, we implement n-grams to allow for groups of one, two and three sets of words to be processed so that we collect a maxmimum of 3000 features,
+allowing for a more diverse feature set. Next we define the training and test steps, typically setting aside a portion of the data
+for training so as not to introduce overfitting or an imbalanced dataset, via bias and weights. We use the Random Forests method from machine learning to associate the themes 
+in the texts in a corpora to build a tree of the most common themes or features, which is then used to make predictions, via 
+an F1 score and classification during the training phase using a Support Vector Machine (svm) model to fit or finalise the trained data
+from both 'party' and 'speech', and thus draw predictivde conclusions about which party may have given a speech from the corpora of texts.
+Note that it was important to improve performance by firstly, creating a customised tokenizer that uses a small NLP model with spacy, another python module used
+to efficiently analyse text, thus reducing time and space complexity values; secondly, the use of a set of configuration parameters
+to produce both the n-gram and custom tokenizer reports, with predictive statistics; and thirdly, the use of a balanced dataset in the form of a weight
+parameter set on both the RandomForests and SVM when training the dataset; lastly, the use of. single loop to process each report contributed
+to overall performance of the tokenizer function.
