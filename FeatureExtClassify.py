@@ -97,62 +97,70 @@ def vectorise_speeches(df):
    X_speechtext = df["speech"].astype(str).tolist()
    Y_partylabels  = df["party"].astype(str).tolist()
 
-   # 1. Use AML to extract feature set 
-   vectorizer = TfidfVectorizer(stop_words=stopwords, max_features=max_features)
-   X_features = vectorizer.fit_transform(X_speechtext)
-   print(f"Extraction vector dimensions or shape is: {X_features.shape}")
+   # Define the two n-gram settings you want to compare
+   configs = [
+        {"name": "Standard 1-Grams", "range": (1, 1)},
+        {"name": "Advanced 2,3-Grams", "range": (2, 3)}
+   ]
 
-   # 2. Define training and test sets (split them from data)
-   X_trainset, X_testset, Y_trainset, Y_testset  = train_test_split(
+   for config in configs:
+     # 1. Use AML to extract feature set - also allow for uni (1 word feature), bi (2 word feature) and tri (3 word feature) - grams to be included in the vectorised output
+     # For n-grams referred to: https://www.geeksforgeeks.org/machine-learning/tf-idf-for-bigrams-trigrams/
+     vectorizer = TfidfVectorizer(stop_words=stopwords, max_features=max_features, ngram_range=config["range"])
+     X_features = vectorizer.fit_transform(X_speechtext)
+     print(f"Extraction vector dimensions or shape is: {X_features.shape}")
+
+     # 2. Define training and test sets (split them from data)
+     X_trainset, X_testset, Y_trainset, Y_testset  = train_test_split(
       X_features,
       Y_partylabels,
       test_size=0.2,
       random_state=random_seed,
       stratify=Y_partylabels
-   )
+     )
    
-   # TRAINING: For trinaing use SVM/ linear kernel classifiers on the training set
-   rf_model = RandomForestClassifier(n_estimators=n_estimators, random_state=random_seed)
-   rf_model.fit(X_trainset, Y_trainset)
+     # TRAINING: For trinaing use SVM/ linear kernel classifiers on the training set
+     rf_model = RandomForestClassifier(n_estimators=n_estimators, random_state=random_seed)
+     rf_model.fit(X_trainset, Y_trainset)
 
-   # TESTING: Print macro-average-f1-score and classification report for each classifier on the test set 
-   rf_prediction = rf_model.predict(X_testset)
-   rf_macro_score = f1_score(Y_testset, rf_prediction, average="macro") 
+     # TESTING: Print macro-average-f1-score and classification report for each classifier on the test set 
+     rf_prediction = rf_model.predict(X_testset)
+     rf_macro_score = f1_score(Y_testset, rf_prediction, average="macro") 
 
-   print(f"F1 score estimate {rf_macro_score: .4f}")
-   print(f"Classification report...")
-   print(classification_report(Y_testset, rf_prediction))
+     print(f"F1 score estimate {rf_macro_score: .4f}")
+     print(f"Classification report...")
+     print(classification_report(Y_testset, rf_prediction))
 
-   # SVM classifier, using a linear classifier
-   svm_model = SVC(kernel='linear', random_state=random_seed)
-   svm_model.fit(X_trainset, Y_trainset)
-   # Linear performance
-   svm_prediction = svm_model.predict(X_testset)
-   svm_macro_score = f1_score(Y_testset, svm_prediction, average="macro") 
+     # SVM classifier, using a linear classifier
+     svm_model = SVC(kernel='linear', random_state=random_seed)
+     svm_model.fit(X_trainset, Y_trainset)
+     # Linear performance
+     svm_prediction = svm_model.predict(X_testset)
+     svm_macro_score = f1_score(Y_testset, svm_prediction, average="macro") 
 
-   print(f"F1 score estimate for SVM {svm_macro_score: .4f}")
-   print(f"Classification report for SVM...")
-   print(classification_report(Y_testset, svm_prediction))
+     print(f"F1 score estimate for SVM {svm_macro_score: .4f}")
+     print(f"Classification report for SVM...")
+     print(classification_report(Y_testset, svm_prediction))
 
-   svm_all_predictions = svm_model.predict(X_testset)
-   rf_all_predictions = rf_model.predict(X_testset)
+     svm_all_predictions = svm_model.predict(X_testset)
+     rf_all_predictions = rf_model.predict(X_testset)
 
-   # 2. Build a clean comparison table for all speeches
-   predictions_df = pd.DataFrame({
+     # 2. Build a clean comparison table for all speeches
+     predictions_df = pd.DataFrame({
         "Row_Index": range(len(Y_testset)),
         "Actual_Party": Y_testset,
         "SVM_Predicted": svm_all_predictions,
         "RF_Predicted": rf_all_predictions
-    })
+     })
 
-   # Return label for party - use pandas to allow full output in a table and reset after
-   pd.set_option('display.max_rows', None)
-   unique_labels = np.unique(Y_partylabels).tolist()
+     # Return label for party - use pandas to allow full output in a table and reset after
+     pd.set_option('display.max_rows', None)
+     unique_labels = np.unique(Y_partylabels).tolist()
 
-   print(f"All Party Speech - Predictions Below ")
-   print(f"{predictions_df.to_string(index=False)}")
+     print(f"All Party Speech - Predictions - with {config["name"]} ")
+     print(f"{predictions_df.to_string(index=False)}")
 
-   pd.reset_option('display.max_rows')
+     pd.reset_option('display.max_rows')
    return unique_labels
 
 if __name__ == "__main__":
